@@ -1004,7 +1004,11 @@
                 yc = solveTrapezoidalYc(Q, B, z);
                 const Ac = getTrapArea(yc, B, z);
                 Emin = yc + (Q * Q) / (2 * g * Ac * Ac);
-                valQ.innerHTML = `<span class="text-xs">梯形 z=${z.toFixed(2)}</span>`;
+                
+                // 梯形斷面的兩種單位寬度流量水理解析定義
+                const q_bottom = Q / B; // 底寬單位流量 (Discharge per unit bottom width)
+                const q_mean = Q / (B + z * yc); // 臨界狀態平均過水寬度流量 (Discharge per unit mean width at critical depth)
+                valQ.innerHTML = `<span class="text-xs font-bold">${q_bottom.toFixed(3)} (底寬) | ${q_mean.toFixed(3)} (平均)</span>`;
             }
 
             // 步驟 2：流態判定
