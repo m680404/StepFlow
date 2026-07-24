@@ -1075,20 +1075,39 @@
             }
 
             if (regime.includes("跌水流")) {
-                // 跌水流：拋物線分段採樣並加上安全鎖，防止水流在跌落中穿透踏步突出角
+                // 跌水流：模擬水流在踏面上平流，並在越過階梯邊緣後呈拋物線跌落至下一階
                 flowPath = ` L ${xStepStart_px},${waterUpY}`;
+                const r_drop = 0.4; // 跌落段長度比例 (佔階梯水平長度的 40%)
+                const y_flat = Math.max(0.08, yc * 0.35); // 踏面上的平流水深
+                
                 for (let i = 1; i <= N; i++) {
                     const startX = (i - 1) * step_l;
                     const startY = -(i - 1) * h_act;
-                    const pts = 6;
+                    const pts = 10;
+                    
                     for (let k = 1; k <= pts; k++) {
                         const t = k / pts;
                         const x_m = startX + t * step_l;
-                        const y_start = startY + yc * 0.50;
-                        const y_end = startY - h_act + yc * 0.20;
-                        let y_water_m = y_start + (y_end - y_start) * t * t;
-                        // 碰撞安全鎖 (高於階梯面至少 0.08m)
-                        y_water_m = Math.max(y_water_m, getStepMaxY(x_m) + 0.08);
+                        let y_water_m;
+                        
+                        if (t <= r_drop) {
+                            // 1. 跌落段：水流從上一階跌落到本階踏面
+                            const u = t / r_drop; // 局部歸一化參數 [0, 1]
+                            
+                            // 上一階的平流高程 (第一階起點接上游平台水面)
+                            const y_prev_flat = (i === 1) ? yc : (-(i - 2) * h_act + y_flat);
+                            // 本階的平流高程
+                            const y_curr_flat = startY + y_flat;
+                            
+                            // 拋物線跌落軌跡 (u=0 時斜率為 0，u=1 時接平流段)
+                            y_water_m = y_prev_flat + (y_curr_flat - y_prev_flat) * u * u;
+                        } else {
+                            // 2. 平流段：水流在這一階的水平踏面上流動
+                            y_water_m = startY + y_flat;
+                        }
+                        
+                        // 碰撞安全鎖 (高於目前階梯表面至少 0.05m，做為雙重保險)
+                        y_water_m = Math.max(y_water_m, getStepMaxY(x_m) + 0.05);
                         flowPath += ` L ${getX(x_m)},${getY(y_water_m)}`;
                     }
                 }
