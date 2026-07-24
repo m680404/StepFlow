@@ -834,8 +834,22 @@
 
             // 步驟 3：殘餘能量與趾部水深
             const H0 = H_total + 1.5 * yc;
-            const H_res = H0 * 0.4;
-            const y1 = solveY1(q, H_res);
+            let H_res = H0 * 0.4;
+            
+            // 物理防呆：殘餘比能 H_res 不能小於該流量下的最小臨界比能 Emin (1.5 * yc)
+            // 當落差 H_total 相對於流量過小時，消能率不可能達到 60%，必須予以限制以確保方程式有超臨界流解
+            const Emin = 1.5 * yc;
+            if (H_res < Emin * 1.05) {
+                H_res = Emin * 1.05;
+            }
+            
+            let y1 = solveY1(q, H_res);
+            
+            // 物理防呆：趾部水深 y1 必須為急流(超臨界流)，即 y1 < yc
+            // 若牛頓迭代法因無解或數值震盪導致 y1 異常，強制設為合理的急流水深
+            if (isNaN(y1) || y1 >= yc || y1 <= 0) {
+                y1 = yc * 0.35; // 典型急流水深估計
+            }
             const v1 = q / y1;
 
             // 步驟 4：靜水池與水躍檢算
@@ -848,7 +862,8 @@
             if (Fr1 > 1.7 || v1 > v_allow) {
                 needBasin = true;
                 y2 = (y1 / 2) * (Math.sqrt(1 + 8 * Fr1 * Fr1) - 1);
-                L = 5 * (y2 - y1);
+                // 確保消能長度 L 恆為正值
+                L = Math.max(0.5, 5 * (y2 - y1));
             }
 
             // 靜水池效能與尺寸比對判定
@@ -1142,7 +1157,7 @@
             }
 
             // 下游水躍終點
-            const endJumpX_m = stepEnd_x_m + L;
+            const endJumpX_m = stepEnd_x_m + Math.max(0.5, L);
             const endJumpY_m = poolBottomY_act + y2;
             const endJumpX_px = getX(endJumpX_m);
             const endJumpY_px = getY(endJumpY_m);
