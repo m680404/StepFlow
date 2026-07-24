@@ -127,6 +127,36 @@
                             <p id="err_B" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>寬度必須大於零</p>
                         </div>
 
+                        <!-- 斷面類型 -->
+                        <div>
+                            <label for="input_section_type" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                <span>渠道斷面類型</span>
+                            </label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <select id="input_section_type" 
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none appearance-none">
+                                    <option value="rectangular" class="bg-white dark:bg-slate-900">矩形斷面 (Rectangular)</option>
+                                    <option value="trapezoidal" class="bg-white dark:bg-slate-900">梯形斷面 (Trapezoidal)</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500 dark:text-slate-400">
+                                    <i class="fa-solid fa-chevron-down text-sm"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 側邊坡比 z (僅梯形斷面顯示) -->
+                        <div id="field_z" class="hidden">
+                            <label for="input_z" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                <span>側坡比 (垂直 1 : 水平 <span class="italic font-semibold">z</span>)</span>
+                                <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">請輸入水平值 z</span>
+                            </label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" step="0.01" id="input_z" value="1.00" min="0.00" placeholder="例如：1.0" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                            </div>
+                            <p id="err_z" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>坡比不可為負數</p>
+                        </div>
+
                         <!-- 階梯幾何：高度 h 與 長度 l -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
@@ -495,6 +525,9 @@
         const inputLd = document.getElementById('input_Ld');
         const inputdd = document.getElementById('input_dd');
         const inputyt = document.getElementById('input_yt');
+        const inputSectionType = document.getElementById('input_section_type');
+        const inputZ = document.getElementById('input_z');
+        const fieldZ = document.getElementById('field_z');
 
         // 錯誤/警告提示
         const errQ = document.getElementById('err_Q');
@@ -506,6 +539,7 @@
         const errLd = document.getElementById('err_Ld');
         const errdd = document.getElementById('err_dd');
         const erryt = document.getElementById('err_yt');
+        const errZ = document.getElementById('err_z');
         const warnSlope = document.getElementById('warn_slope');
         const slopeRatioVal = document.getElementById('slope-ratio-val');
 
@@ -700,6 +734,25 @@
                 }
             }
 
+            // 檢查斷面類型與坡比 z
+            const sectionType = inputSectionType.value;
+            if (sectionType === 'trapezoidal') {
+                fieldZ.classList.remove('hidden');
+                const zVal = parseFloat(inputZ.value);
+                if (isNaN(zVal) || zVal < 0) {
+                    errZ.classList.remove('hidden');
+                    inputZ.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                    isValid = false;
+                } else {
+                    errZ.classList.add('hidden');
+                    inputZ.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                }
+            } else {
+                fieldZ.classList.add('hidden');
+                errZ.classList.add('hidden');
+                inputZ.classList.remove('border-red-500');
+            }
+
             return isValid;
         }
 
@@ -714,7 +767,9 @@
                 'v_allow': inputVallow,
                 'Ld': inputLd,
                 'dd': inputdd,
-                'yt': inputyt
+                'yt': inputyt,
+                'section_type': inputSectionType,
+                'z': inputZ
             };
             for (const [key, element] of Object.entries(keys)) {
                 const saved = localStorage.getItem('stepflow_' + key);
@@ -735,7 +790,9 @@
                 'v_allow': inputVallow.value,
                 'Ld': inputLd.value,
                 'dd': inputdd.value,
-                'yt': inputyt.value
+                'yt': inputyt.value,
+                'section_type': inputSectionType.value,
+                'z': inputZ.value
             };
             for (const [key, value] of Object.entries(keys)) {
                 localStorage.setItem('stepflow_' + key, value);
@@ -743,13 +800,19 @@
         }
 
         // 綁定輸入監聽
-        [inputQ, inputB, inputH, inputL, inputHtotal, inputVallow, inputLd, inputdd, inputyt].forEach(element => {
+        [inputQ, inputB, inputH, inputL, inputHtotal, inputVallow, inputLd, inputdd, inputyt, inputZ].forEach(element => {
             element.addEventListener('input', () => {
                 validateInputs();
                 if (validateInputs()) {
                     runHydraulicCalculation();
                 }
             });
+        });
+        inputSectionType.addEventListener('change', () => {
+            validateInputs();
+            if (validateInputs()) {
+                runHydraulicCalculation();
+            }
         });
 
         // 3. 牛頓-拉弗森求解趾部水深 y1
@@ -782,6 +845,131 @@
             return y1;
         }
 
+        // 3.1 梯形斷面水理輔助函數
+        function getTrapArea(y, B, z) {
+            return (B + z * y) * y;
+        }
+
+        function getTrapTopWidth(y, B, z) {
+            return B + 2 * z * y;
+        }
+
+        function getTrapFroude(y, Q, B, z) {
+            const A = getTrapArea(y, B, z);
+            if (A <= 0) return 0;
+            const T = getTrapTopWidth(y, B, z);
+            return Q * Math.sqrt(T) / (A * Math.sqrt(g * A));
+        }
+
+        // 3.2 梯形斷面臨界水深求解器 (牛頓法)
+        function solveTrapezoidalYc(Q, B, z) {
+            if (z === 0) {
+                const q = Q / B;
+                return Math.pow((q * q) / g, 1 / 3);
+            }
+            
+            const q = Q / B;
+            let yc = Math.pow((q * q) / g, 1 / 3);
+            const maxIterations = 200;
+            const tolerance = 1e-6;
+            
+            for (let i = 0; i < maxIterations; i++) {
+                const A = (B + z * yc) * yc;
+                const T = B + 2 * z * yc;
+                const f = g * Math.pow(A, 3) - Q * Q * T;
+                const df = 3 * g * A * A * T - 2 * Q * Q * z;
+                
+                if (Math.abs(df) < 1e-12) break;
+                
+                let nextYc = yc - f / df;
+                if (nextYc <= 0) nextYc = 0.01;
+                
+                if (Math.abs(nextYc - yc) < tolerance) {
+                    return nextYc;
+                }
+                yc = nextYc;
+            }
+            return yc;
+        }
+
+        // 3.3 梯形斷面趾部水深求解器 (牛頓法)
+        function solveTrapezoidalY1(Q, B, z, H_res) {
+            let y1 = 0.1;
+            const maxIterations = 200;
+            const tolerance = 1e-5;
+            
+            for (let i = 0; i < maxIterations; i++) {
+                const A = (B + z * y1) * y1;
+                if (A <= 0) {
+                    y1 = 0.01;
+                    continue;
+                }
+                const T = B + 2 * z * y1;
+                
+                const f = y1 + (Q * Q) / (2 * g * A * A) - H_res;
+                const df = 1 - (Q * Q * T) / (g * A * A * A);
+                
+                let df_safe = df;
+                if (Math.abs(df_safe) < 1e-12) {
+                    df_safe = df_safe < 0 ? -1e-12 : 1e-12;
+                }
+                
+                let nextY1 = y1 - f / df_safe;
+                
+                if (nextY1 <= 0) {
+                    nextY1 = 0.01;
+                } else if (nextY1 >= H_res) {
+                    nextY1 = H_res - 0.01;
+                }
+                
+                if (Math.abs(nextY1 - y1) < tolerance) {
+                    return nextY1;
+                }
+                y1 = nextY1;
+            }
+            return y1;
+        }
+
+        // 3.4 梯形斷面共軛水深求解器 (動量守恆牛頓法)
+        function solveTrapezoidalY2(Q, B, z, y1) {
+            const A1 = (B + z * y1) * y1;
+            const J1 = (Q * Q) / (g * A1) + (y1 * y1 / 2) * (B + (2 / 3) * z * y1);
+            
+            const yc = solveTrapezoidalYc(Q, B, z);
+            let y2 = yc * 1.5;
+            const maxIterations = 200;
+            const tolerance = 1e-5;
+            
+            for (let i = 0; i < maxIterations; i++) {
+                const A2 = (B + z * y2) * y2;
+                if (A2 <= 0) {
+                    y2 = yc + 0.1;
+                    continue;
+                }
+                const T2 = B + 2 * z * y2;
+                
+                const f = (Q * Q) / (g * A2) + (y2 * y2 / 2) * (B + (2 / 3) * z * y2) - J1;
+                const df = A2 - (Q * Q * T2) / (g * A2 * A2);
+                
+                let df_safe = df;
+                if (Math.abs(df_safe) < 1e-12) {
+                    df_safe = df_safe < 0 ? -1e-12 : 1e-12;
+                }
+                
+                let nextY2 = y2 - f / df_safe;
+                
+                if (nextY2 <= yc) {
+                    nextY2 = yc + 0.05;
+                }
+                
+                if (Math.abs(nextY2 - y2) < tolerance) {
+                    return nextY2;
+                }
+                y2 = nextY2;
+            }
+            return y2;
+        }
+
         // 4. 水力計算核心
         function runHydraulicCalculation() {
             if (!validateInputs()) return;
@@ -799,10 +987,25 @@
             const L_d = parseFloat(inputLd.value);
             const d_d = parseFloat(inputdd.value);
             const y_t = parseFloat(inputyt.value);
+            const sectionType = inputSectionType.value;
+            const z = sectionType === 'trapezoidal' ? parseFloat(inputZ.value) : 0;
 
-            // 步驟 1：基礎參數與臨界水深
-            const q = Q / B;
-            const yc = Math.pow((q * q) / g, 1 / 3);
+            // 步驟 1：臨界水深與斷面幾何計算
+            let yc = 0;
+            let q = 0;
+            let Emin = 0;
+            
+            if (sectionType === 'rectangular') {
+                q = Q / B;
+                yc = Math.pow((q * q) / g, 1 / 3);
+                Emin = 1.5 * yc;
+                valQ.textContent = `${q.toFixed(3)} CMS/m`;
+            } else {
+                yc = solveTrapezoidalYc(Q, B, z);
+                const Ac = getTrapArea(yc, B, z);
+                Emin = yc + (Q * Q) / (2 * g * Ac * Ac);
+                valQ.innerHTML = `<span class="text-xs">梯形 z=${z.toFixed(2)}</span>`;
+            }
 
             // 步驟 2：流態判定
             const slope = h / l;
@@ -832,28 +1035,40 @@
                 statusTheme = "warning";
             }
 
-            // 步驟 3：殘餘能量與趾部水深
-            const H0 = H_total + 1.5 * yc;
+            // 步驟 3：殘餘能量與趾部水深 y1
+            const H0 = H_total + Emin;
             let H_res = H0 * 0.4;
             
-            // 物理防呆：殘餘比能 H_res 不能小於該流量下的最小臨界比能 Emin (1.5 * yc)
-            // 當落差 H_total 相對於流量過小時，消能率不可能達到 60%，必須予以限制以確保方程式有超臨界流解
-            const Emin = 1.5 * yc;
+            // 物理防呆：殘餘比能 H_res 不能小於最小可行比能 Emin
             if (H_res < Emin * 1.05) {
                 H_res = Emin * 1.05;
             }
             
-            let y1 = solveY1(q, H_res);
+            let y1 = 0;
+            let v1 = 0;
             
-            // 物理防呆：趾部水深 y1 必須為急流(超臨界流)，即 y1 < yc
-            // 若牛頓迭代法因無解或數值震盪導致 y1 異常，強制設為合理的急流水深
-            if (isNaN(y1) || y1 >= yc || y1 <= 0) {
-                y1 = yc * 0.35; // 典型急流水深估計
+            if (sectionType === 'rectangular') {
+                y1 = solveY1(q, H_res);
+                if (isNaN(y1) || y1 >= yc || y1 <= 0) {
+                    y1 = yc * 0.35;
+                }
+                v1 = q / y1;
+            } else {
+                y1 = solveTrapezoidalY1(Q, B, z, H_res);
+                if (isNaN(y1) || y1 >= yc || y1 <= 0) {
+                    y1 = yc * 0.35;
+                }
+                const A1 = getTrapArea(y1, B, z);
+                v1 = Q / A1;
             }
-            const v1 = q / y1;
 
             // 步驟 4：靜水池與水躍檢算
-            const Fr1 = v1 / Math.sqrt(g * y1);
+            let Fr1 = 0;
+            if (sectionType === 'rectangular') {
+                Fr1 = v1 / Math.sqrt(g * y1);
+            } else {
+                Fr1 = getTrapFroude(y1, Q, B, z);
+            }
             
             let needBasin = false;
             let y2 = 0;
@@ -861,8 +1076,11 @@
 
             if (Fr1 > 1.7 || v1 > v_allow) {
                 needBasin = true;
-                y2 = (y1 / 2) * (Math.sqrt(1 + 8 * Fr1 * Fr1) - 1);
-                // 確保消能長度 L 恆為正值
+                if (sectionType === 'rectangular') {
+                    y2 = (y1 / 2) * (Math.sqrt(1 + 8 * Fr1 * Fr1) - 1);
+                } else {
+                    y2 = solveTrapezoidalY2(Q, B, z, y1);
+                }
                 L = Math.max(0.5, 5 * (y2 - y1));
             }
 
@@ -888,12 +1106,25 @@
             }
 
             resFr1.textContent = Fr1.toFixed(2);
-            if (Fr1 > 1.0) {
-                resFr1Type.textContent = "超臨界流 (射流狀態)";
-                resFr1Type.className = "text-xs font-semibold text-amber-500 mt-1.5";
-            } else {
+            if (Fr1 < 0.999) {
                 resFr1Type.textContent = "亞臨界流 (緩流狀態)";
                 resFr1Type.className = "text-xs font-semibold text-sky-500 mt-1.5";
+            } else if (Math.abs(Fr1 - 1.0) <= 0.001) {
+                resFr1Type.textContent = "臨界流";
+                resFr1Type.className = "text-xs font-semibold text-teal-500 mt-1.5";
+            } else {
+                let jumpType = "";
+                if (Fr1 <= 1.7) {
+                    jumpType = "波動水躍";
+                } else if (Fr1 <= 2.5) {
+                    jumpType = "弱水躍";
+                } else if (Fr1 <= 4.5) {
+                    jumpType = "震盪水躍";
+                } else {
+                    jumpType = "穩定水躍";
+                }
+                resFr1Type.textContent = `超臨界流 (${jumpType})`;
+                resFr1Type.className = "text-xs font-semibold text-amber-500 mt-1.5";
             }
 
             // 靜水池需求建議渲染 (動態提供建議設置的具體原因)
@@ -913,7 +1144,6 @@
             }
 
             // 詳細數據渲染
-            valQ.textContent = `${q.toFixed(3)} CMS/m`;
             valYc.textContent = `${yc.toFixed(3)} m`;
             valYchRatio.textContent = ychRatio.toFixed(3);
             valY1.textContent = `${y1.toFixed(4)} m`;
