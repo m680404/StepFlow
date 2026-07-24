@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="scroll-smooth dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>階梯渠底水理分析與靜水池設計檢算系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'Inter', 'Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* 自訂細節微調 */
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .dark .glass-panel {
+            background-color: rgba(15, 23, 42, 0.85);
+        }
+        /* 旋渦與波動動畫 */
+        /* SVG 文字描邊防重疊，大幅提升可讀性 */
+        svg text {
+            paint-order: stroke fill;
+            stroke: #ffffff;
+            stroke-width: 4.5px;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .dark svg text {
+            stroke: #0f172a; /* 暗色模式背景色，形成漂亮的外發光隔離帶 */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300 font-sans antialiased">
+
+    <!-- 頂部導覽列 -->
+    <header class="sticky top-0 z-50 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-brand-600 to-teal-500 text-white p-2.5 rounded-xl shadow-md shadow-brand-500/20">
+                    <i class="fa-solid fa-water-ladder text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-slate-900 via-brand-700 to-teal-600 dark:from-white dark:via-brand-400 dark:to-teal-400 bg-clip-text text-transparent">
+                        階梯渠底水理分析與靜水池設計檢算系統
+                    </h1>
+                    <p class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Stepped Spillway Hydraulics & Stilling Basin Design Tool</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <!-- 深淺色切換按鈕 -->
+                <button id="theme-toggle" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-slate-600 dark:text-slate-300" aria-label="切換主題">
+                    <i id="theme-toggle-light-icon" class="fa-solid fa-sun hidden text-amber-500"></i>
+                    <i id="theme-toggle-dark-icon" class="fa-solid fa-moon text-indigo-400"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主區塊 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 左側：參數輸入區 -->
+            <section class="lg:col-span-5 space-y-6">
+                <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl shadow-xl p-6 transition-all duration-300">
+                    <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-200/60 dark:border-slate-800/60">
+                        <div class="flex items-center space-x-2.5">
+                            <i class="fa-solid fa-sliders text-brand-500 text-lg"></i>
+                            <h2 class="text-base sm:text-lg font-semibold">水理與幾何參數輸入</h2>
+                        </div>
+
+                    </div>
+
+                    <form id="calc-form" class="space-y-5" onsubmit="event.preventDefault();">
+                        <!-- 設計流量 Q -->
+                        <div>
+                            <label for="input_Q" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                <span>設計流量 <span class="italic font-semibold">Q</span></span>
+                                <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">CMS (m³/s)</span>
+                            </label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" step="0.01" id="input_Q" value="10.00" min="0.01" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                            </div>
+                            <p id="err_Q" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>流量必須大於零</p>
+                        </div>
+
+                        <!-- 渠道寬度 B -->
+                        <div>
+                            <label for="input_B" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                <span>渠道寬度 <span class="italic font-semibold">B</span></span>
+                                <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">公尺 (m)</span>
+                            </label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" step="0.01" id="input_B" value="4.00" min="0.01" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                            </div>
+                            <p id="err_B" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>寬度必須大於零</p>
+                        </div>
+
+                        <!-- 階梯幾何：高度 h 與 長度 l -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="input_h" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                    <span>階高 <span class="italic font-semibold">h</span></span>
+                                    <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">m</span>
+                                </label>
+                                <input type="number" step="0.01" id="input_h" value="0.50" min="0.01" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                                <p id="err_h" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>須大於 0</p>
+                            </div>
+                            <div>
+                                <label for="input_l" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                    <span>階長 <span class="italic font-semibold">l</span></span>
+                                    <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">m</span>
+                                </label>
+                                <input type="number" step="0.01" id="input_l" value="1.00" min="0.01" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                                <p id="err_l" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>須大於 0</p>
+                            </div>
+                        </div>
+
+                        <!-- 坡度防呆警示 (h/l > 1) -->
+                        <div id="warn_slope" class="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-xl hidden text-red-600 dark:text-red-400 text-xs sm:text-sm">
+                            <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500 text-sm"></i>
+                            <strong>坡度警告：</strong>階高與階長之比值 <span class="italic font-semibold">h/l</span> = <span id="slope-ratio-val" class="font-bold">0.00</span> 已大於 1.0 (即坡度角已大於 45°)。實務上不建議設計此類過陡之渠道階梯，請調整。
+                        </div>
+
+                        <!-- 階梯總落差 H_total -->
+                        <div>
+                            <label for="input_H_total" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                <span>階梯總落差 <span class="italic font-semibold">H<sub>total</sub></span></span>
+                                <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">公尺 (m)</span>
+                            </label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" step="0.01" id="input_H_total" value="5.00" min="0.1" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                            </div>
+                            <p id="err_H_total" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>總落差必須大於零</p>
+                        </div>
+
+                        <!-- 下游渠道最大容許流速 v_allow -->
+                        <div>
+                            <label for="input_v_allow" class="block text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                <span>下游最大容許流速 <span class="italic font-semibold">v<sub>allow</sub></span></span>
+                                <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">公尺/秒 (m/s)</span>
+                            </label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" step="0.1" id="input_v_allow" value="3.0" min="0.1" required
+                                    class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                            </div>
+                            <p id="err_v_allow" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>容許流速必須大於零</p>
+                        </div>
+
+                        <!-- 下游靜水池設計規格 (檢算用) -->
+                        <div class="mt-6 pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
+                            <h3 class="text-sm sm:text-base font-semibold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+                                <i class="fa-solid fa-drafting-compass text-teal-500"></i>
+                                <span>下游靜水池設計規格（檢算用）</span>
+                            </h3>
+                            <div class="space-y-4">
+                                <!-- 設計池長 Ld -->
+                                <div>
+                                    <label for="input_Ld" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                        <span>設計池長 <span class="italic font-semibold">L_d</span></span>
+                                        <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">公尺 (m)</span>
+                                    </label>
+                                    <input type="number" step="0.1" id="input_Ld" value="6.0" min="0.1" required
+                                        class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-2.5 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                                    <p id="err_Ld" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>設計長度必須大於零</p>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <!-- 設計池深 dd -->
+                                    <div>
+                                        <label for="input_dd" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                            <span>設計池深 <span class="italic font-semibold">d_d</span></span>
+                                            <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">m</span>
+                                        </label>
+                                        <input type="number" step="0.05" id="input_dd" value="0.50" min="0.0" required
+                                            class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-2.5 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                                        <p id="err_dd" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>不可為負數</p>
+                                    </div>
+                                    <!-- 下游尾水深 yt -->
+                                    <div>
+                                        <label for="input_yt" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
+                                            <span>渠道尾水深 <span class="italic font-semibold">y_t</span></span>
+                                            <span class="text-xs sm:text-sm text-slate-400 dark:text-slate-500">m</span>
+                                        </label>
+                                        <input type="number" step="0.05" id="input_yt" value="1.20" min="0.01" required
+                                            class="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 px-4 py-2.5 text-slate-950 dark:text-white focus:border-brand-500 focus:ring-brand-500 text-sm sm:text-base transition-all outline-none">
+                                        <p id="err_yt" class="mt-1 text-xs sm:text-sm text-red-500 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>必須大於零</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+            </section>
+
+            <!-- 右側：計算結果與檢核報告區 -->
+            <section class="lg:col-span-7 space-y-6">
+                
+                <!-- 第一部分：三大核心數據指標 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <!-- 流態結果卡片 -->
+                    <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl">
+                        <div class="absolute -right-4 -bottom-4 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fa-solid fa-water text-8xl text-brand-600"></i>
+                        </div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">流態判定結果</p>
+                        <h3 id="res-flow-regime" class="text-lg sm:text-xl font-bold mt-2 text-slate-900 dark:text-white flex items-center space-x-2">
+                            <span>讀取中...</span>
+                        </h3>
+                        <p id="res-flow-regime-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">計算中</p>
+                    </div>
+
+                    <!-- 趾部流速 v1 卡片 -->
+                    <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl">
+                        <div class="absolute -right-4 -bottom-4 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fa-solid fa-gauge-high text-8xl text-teal-600"></i>
+                        </div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">趾部最大流速 <span class="italic font-bold">v₁</span></p>
+                        <h3 id="res-v1" class="text-2xl sm:text-3xl font-extrabold mt-1 text-teal-600 dark:text-teal-400">
+                            -- <span class="text-lg font-medium text-slate-500">m/s</span>
+                        </h3>
+                        <p id="res-v1-check" class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 flex items-center">
+                            <i class="fa-solid fa-circle-question mr-1"></i>未檢核
+                        </p>
+                    </div>
+
+                    <!-- 趾部福祿數 Fr1 卡片 -->
+                    <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl">
+                        <div class="absolute -right-4 -bottom-4 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fa-solid fa-wind text-8xl text-indigo-600"></i>
+                        </div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">趾部福祿數 <span class="italic font-bold">Fr₁</span></p>
+                        <h3 id="res-Fr1" class="text-2xl sm:text-3xl font-extrabold mt-1 text-indigo-600 dark:text-indigo-400">
+                            --
+                        </h3>
+                        <p id="res-Fr1-type" class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1.5 font-semibold">
+                            --
+                        </p>
+                    </div>
+
+                    <!-- 靜水池需求建議卡片 -->
+                    <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl">
+                        <div class="absolute -right-4 -bottom-4 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fa-solid fa-shield-halved text-8xl text-sky-600"></i>
+                        </div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">靜水池需求建議</p>
+                        <h3 id="res-basin-req" class="text-lg sm:text-xl font-bold mt-2 text-slate-900 dark:text-white flex items-center space-x-2">
+                            <span>計算中...</span>
+                        </h3>
+                        <p id="res-basin-req-desc" class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1.5 font-semibold">
+                            --
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 第二部分：動態水理示意圖 -->
+                <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl shadow-xl p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-regular fa-image text-brand-500 text-lg"></i>
+                            <h3 class="font-semibold text-sm sm:text-base text-slate-900 dark:text-white">動態水理剖面示意圖</h3>
+                        </div>
+                        <span class="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">非真實工程圖，供水理尺度參考</span>
+                    </div>
+                    
+                    <!-- SVG 繪圖區 -->
+                    <div class="relative w-full aspect-[8/3.5] bg-slate-100 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+                        <svg id="hydraulic-svg" viewBox="0 0 1000 400" class="w-full h-full">
+                            <!-- 定義漸層與濾鏡 -->
+                            <defs>
+                                <!-- 正常流水漸層 -->
+                                <linearGradient id="waterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8" />
+                                    <stop offset="100%" stop-color="#0284c7" stop-opacity="0.9" />
+                                </linearGradient>
+                                <!-- 過渡流/警告水流漸層 -->
+                                <linearGradient id="warnWaterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.8" />
+                                    <stop offset="100%" stop-color="#d97706" stop-opacity="0.9" />
+                                </linearGradient>
+                                <!-- 混凝土結構漸層 -->
+                                <linearGradient id="concreteGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#cbd5e1" />
+                                    <stop offset="100%" stop-color="#94a3b8" />
+                                </linearGradient>
+                                <linearGradient id="concreteDarkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#334155" />
+                                    <stop offset="100%" stop-color="#1e293b" />
+                                </linearGradient>
+                                <!-- 水躍泡沫濾鏡 -->
+                                <pattern id="foamPattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                                    <circle cx="5" cy="5" r="2" fill="#ffffff" fill-opacity="0.4" />
+                                    <circle cx="15" cy="12" r="1.5" fill="#ffffff" fill-opacity="0.3" />
+                                    <circle cx="10" cy="18" r="1.2" fill="#ffffff" fill-opacity="0.2" />
+                                </pattern>
+                            </defs>
+
+                            <!-- 背景格線 (網格) -->
+                            <g stroke="#94a3b8" stroke-width="0.5" stroke-opacity="0.12" stroke-dasharray="3,3">
+                                <path d="M 0,60 L 1000,60 M 0,120 L 1000,120 M 0,180 L 1000,180 M 0,240 L 1000,240 M 0,300 L 1000,300 M 0,360 L 1000,360" />
+                                <path d="M 100,0 L 100,400 M 200,0 L 200,400 M 300,0 L 300,400 M 400,0 L 400,400 M 500,0 L 500,400 M 600,0 L 600,400 M 700,0 L 700,400 M 800,0 L 800,400 M 900,0 L 900,400" />
+                            </g>
+
+                            <!-- 水體路徑 (動態，置於底層) -->
+                            <path id="water-flow" fill="url(#waterGrad)" />
+
+                            <!-- 渠道結構 (實色覆蓋在水體上方，使水流只顯示在渠道之上) -->
+                            <path id="structural-base" fill="url(#concreteGrad)" stroke="#475569" stroke-width="3" />
+                            <!-- 設計靜水池框線（合格綠/警告紅） -->
+                            <path id="basin-design-outline" fill="none" stroke-width="3" stroke-dasharray="6,4" class="hidden" />
+                            
+                            <!-- 亮藍色水面描邊線 -->
+                            <path id="water-surface" fill="none" stroke="#0284c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                            
+                            <!-- 水躍泡沫疊加 -->
+                            <path id="jump-foam" fill="url(#foamPattern)" class="hidden" />
+
+                            <!-- 標註線與文字 (CAD 分層標註，放大字體與加粗線條) -->
+                            <g id="annotations" class="font-bold fill-slate-800 dark:fill-slate-200 stroke-slate-500 dark:stroke-slate-500 stroke-width-0.5" font-size="22">
+                                <!-- 臨界水深 yc 虛線 -->
+                                <line id="yc-line" stroke="#f43f5e" stroke-width="2.5" stroke-dasharray="5,4" />
+                                <text id="yc-text" class="fill-red-600 dark:fill-red-400">y_c = -- m</text>
+
+                                <!-- 趾部水深 y1 指示 (加粗並使用橘色互補色以防與水流重疊) -->
+                                <g id="y1-annotation">
+                                    <line stroke="#ea580c" stroke-width="3.5" />
+                                    <polyline fill="none" stroke="#ea580c" stroke-width="2.5" stroke-dasharray="4,2" />
+                                    <text class="fill-orange-600 dark:fill-orange-400">y₁ = -- m</text>
+                                </g>
+
+                                <!-- 共軛水深 y2 指示 (加粗並使用紫色以利區分) -->
+                                <g id="y2-annotation">
+                                    <line stroke="#9333ea" stroke-width="3.5" />
+                                    <polyline fill="none" stroke="#9333ea" stroke-width="2.5" stroke-dasharray="4,2" />
+                                    <text class="fill-purple-600 dark:fill-purple-400">y₂ = -- m</text>
+                                </g>
+
+                                <!-- 靜水池長度 L 尺寸線 -->
+                                <g id="L-annotation">
+                                    <line stroke="#0d9488" stroke-width="2.2" />
+                                    <polygon points="0,0 0,0 0,0" fill="#0d9488" />
+                                    <polygon points="0,0 0,0 0,0" fill="#0d9488" />
+                                    <text text-anchor="middle" class="fill-teal-700 dark:fill-teal-400">消能池長度 L = -- m</text>
+                                </g>
+                                
+                                <!-- 總落差 H_total 指示 -->
+                                <g id="H-annotation">
+                                    <line stroke="#475569" stroke-width="2" />
+                                    <polygon points="0,0 0,0 0,0" fill="#475569" />
+                                    <polygon points="0,0 0,0 0,0" fill="#475569" />
+                                    <text class="fill-slate-800 dark:fill-slate-200">H_total = -- m</text>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- 第三部分：詳細檢核報告與診斷建議 -->
+                <div class="glass-panel border border-slate-200/60 dark:border-slate-800/60 rounded-2xl shadow-xl p-6 space-y-6">
+                    <div class="flex items-center space-x-2.5 pb-4 border-b border-slate-200/60 dark:border-slate-800/60">
+                        <i class="fa-solid fa-square-poll-horizontal text-brand-500 text-lg"></i>
+                        <h3 class="font-semibold text-base sm:text-lg text-slate-900 dark:text-white">消能檢算診斷建議與詳細數據</h3>
+                    </div>
+
+                    <!-- 診斷建議 Alert -->
+                    <div id="diagnostic-card" class="p-5 rounded-2xl border transition-all duration-300">
+                        <div class="flex items-start space-x-3">
+                            <div id="diagnostic-icon" class="text-2xl mt-0.5">
+                                <!-- 大圖示 -->
+                            </div>
+                            <div class="flex-1 space-y-1.5">
+                                <h4 id="diagnostic-title" class="font-bold text-base sm:text-lg">診斷狀態載入中...</h4>
+                                <div id="diagnostic-desc" class="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                                    請填寫參數並點擊計算。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 詳細水理計算數據 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm sm:text-base">
+                        <!-- 基礎計算項目 -->
+                        <div class="space-y-3">
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">單位流量 <span class="italic">q</span></span>
+                                <span id="val-q" class="font-semibold text-slate-800 dark:text-slate-200">-- CMS/m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">臨界水深 <span class="italic">y_c</span></span>
+                                <span id="val-yc" class="font-semibold text-slate-800 dark:text-slate-200">-- m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">臨界比 <span class="italic">y_c/h</span></span>
+                                <span id="val-ych-ratio" class="font-semibold text-slate-800 dark:text-slate-200">--</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">共軛水深 <span class="italic">y₂</span></span>
+                                <span id="val-y2" class="font-semibold text-slate-800 dark:text-slate-200">-- m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50 text-brand-600 dark:text-brand-400 font-semibold">
+                                <span>所需消能長度 <span class="italic">L_req</span></span>
+                                <span id="val-Lreq">-- m</span>
+                            </div>
+                        </div>
+
+                        <!-- 消能與設計比對項目 -->
+                        <div class="space-y-3">
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">設計靜水池長 <span class="italic">L_d</span></span>
+                                <span id="val-Ld-val" class="font-semibold text-slate-800 dark:text-slate-200">-- m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">設計靜水池深 <span class="italic">d_d</span></span>
+                                <span id="val-dd-val" class="font-semibold text-slate-800 dark:text-slate-200">-- m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">下游渠道尾水深 <span class="italic">y_t</span></span>
+                                <span id="val-yt-val" class="font-semibold text-slate-800 dark:text-slate-200">-- m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50">
+                                <span class="text-slate-500 dark:text-slate-400">池內提供總水深 <span class="italic">y_t + d_d</span></span>
+                                <span id="val-yprov" class="font-semibold text-slate-800 dark:text-slate-200">-- m</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b border-slate-150 dark:border-slate-800/50 text-indigo-500 dark:text-indigo-400 font-semibold">
+                                <span>趾部水深 <span class="italic">y₁</span></span>
+                                <span id="val-y1">-- m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- 底部頁腳 -->
+    <footer class="mt-16 border-t border-slate-200 dark:border-slate-800 py-8 bg-white dark:bg-slate-900 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 dark:text-slate-400">
+            <p>版權所有 © 2026 劉哲旻</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript 邏輯 -->
+    <script>
+        // 常數設定
+        const g = 9.81;
+
+        // DOM 元素取得
+        const toggleBtn = document.getElementById('theme-toggle');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+
+        // 輸入欄位
+        const inputQ = document.getElementById('input_Q');
+        const inputB = document.getElementById('input_B');
+        const inputH = document.getElementById('input_h');
+        const inputL = document.getElementById('input_l');
+        const inputHtotal = document.getElementById('input_H_total');
+        const inputVallow = document.getElementById('input_v_allow');
+        const inputLd = document.getElementById('input_Ld');
+        const inputdd = document.getElementById('input_dd');
+        const inputyt = document.getElementById('input_yt');
+
+        // 錯誤/警告提示
+        const errQ = document.getElementById('err_Q');
+        const errB = document.getElementById('err_B');
+        const errH = document.getElementById('err_h');
+        const errL = document.getElementById('err_l');
+        const errHtotal = document.getElementById('err_H_total');
+        const errVallow = document.getElementById('err_v_allow');
+        const errLd = document.getElementById('err_Ld');
+        const errdd = document.getElementById('err_dd');
+        const erryt = document.getElementById('err_yt');
+        const warnSlope = document.getElementById('warn_slope');
+        const slopeRatioVal = document.getElementById('slope-ratio-val');
+
+        // 核心結果輸出
+        const resFlowRegime = document.getElementById('res-flow-regime');
+        const resFlowRegimeDesc = document.getElementById('res-flow-regime-desc');
+        const resV1 = document.getElementById('res-v1');
+        const resV1Check = document.getElementById('res-v1-check');
+        const resFr1 = document.getElementById('res-Fr1');
+        const resFr1Type = document.getElementById('res-Fr1-type');
+        const resBasinReq = document.getElementById('res-basin-req');
+        const resBasinReqDesc = document.getElementById('res-basin-req-desc');
+
+        // 詳細數據輸出
+        const valQ = document.getElementById('val-q');
+        const valYc = document.getElementById('val-yc');
+        const valYchRatio = document.getElementById('val-ych-ratio');
+        const valY2 = document.getElementById('val-y2');
+        const valLreq = document.getElementById('val-Lreq');
+        const valLdVal = document.getElementById('val-Ld-val');
+        const valddVal = document.getElementById('val-dd-val');
+        const valytVal = document.getElementById('val-yt-val');
+        const valYprov = document.getElementById('val-yprov');
+        const valY1 = document.getElementById('val-y1');
+
+        // 診斷建議
+        const diagnosticCard = document.getElementById('diagnostic-card');
+        const diagnosticIcon = document.getElementById('diagnostic-icon');
+        const diagnosticTitle = document.getElementById('diagnostic-title');
+        const diagnosticDesc = document.getElementById('diagnostic-desc');
+
+        // SVG 元素
+        const svgElement = document.getElementById('hydraulic-svg');
+        const structuralBase = document.getElementById('structural-base');
+        const basinDesignOutline = document.getElementById('basin-design-outline');
+        const waterFlow = document.getElementById('water-flow');
+        const waterSurface = document.getElementById('water-surface');
+        const jumpFoam = document.getElementById('jump-foam');
+        
+        // SVG 標註
+        const ycLine = document.getElementById('yc-line');
+        const ycText = document.getElementById('yc-text');
+        const y1Annotation = document.getElementById('y1-annotation');
+        const y2Annotation = document.getElementById('y2-annotation');
+        const LAnnotation = document.getElementById('L-annotation');
+        const HAnnotation = document.getElementById('H-annotation');
+
+        // 1. 深淺色主題切換
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            lightIcon.classList.remove('hidden');
+            darkIcon.classList.add('hidden');
+        } else {
+            document.documentElement.classList.remove('dark');
+            lightIcon.classList.add('hidden');
+            darkIcon.classList.remove('hidden');
+        }
+
+        toggleBtn.addEventListener('click', function() {
+            lightIcon.classList.toggle('hidden');
+            darkIcon.classList.toggle('hidden');
+
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('color-theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('color-theme', 'dark');
+            }
+            updateSvgConcreteGradient();
+        });
+
+        function updateSvgConcreteGradient() {
+            const isDark = document.documentElement.classList.contains('dark');
+            structuralBase.setAttribute('fill', isDark ? 'url(#concreteDarkGrad)' : 'url(#concreteGrad)');
+        }
+
+        // 2. 即時防呆驗證邏輯
+        function validateInputs() {
+            let isValid = true;
+
+            // 檢查 Q (流量)
+            const qVal = parseFloat(inputQ.value);
+            if (isNaN(qVal) || qVal <= 0) {
+                errQ.classList.remove('hidden');
+                inputQ.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errQ.classList.add('hidden');
+                inputQ.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 B (寬度)
+            const bVal = parseFloat(inputB.value);
+            if (isNaN(bVal) || bVal <= 0) {
+                errB.classList.remove('hidden');
+                inputB.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errB.classList.add('hidden');
+                inputB.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 h (階高)
+            const hVal = parseFloat(inputH.value);
+            if (isNaN(hVal) || hVal <= 0) {
+                errH.classList.remove('hidden');
+                inputH.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errH.classList.add('hidden');
+                inputH.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 l (階長)
+            const lVal = parseFloat(inputL.value);
+            if (isNaN(lVal) || lVal <= 0) {
+                errL.classList.remove('hidden');
+                inputL.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errL.classList.add('hidden');
+                inputL.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 H_total
+            const hTotalVal = parseFloat(inputHtotal.value);
+            if (isNaN(hTotalVal) || hTotalVal <= 0) {
+                errHtotal.classList.remove('hidden');
+                inputHtotal.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errHtotal.classList.add('hidden');
+                inputHtotal.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 v_allow
+            const vAllowVal = parseFloat(inputVallow.value);
+            if (isNaN(vAllowVal) || vAllowVal <= 0) {
+                errVallow.classList.remove('hidden');
+                inputVallow.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errVallow.classList.add('hidden');
+                inputVallow.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 Ld (設計池長)
+            const LdVal = parseFloat(inputLd.value);
+            if (isNaN(LdVal) || LdVal <= 0) {
+                errLd.classList.remove('hidden');
+                inputLd.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errLd.classList.add('hidden');
+                inputLd.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 dd (設計池深)
+            const ddVal = parseFloat(inputdd.value);
+            if (isNaN(ddVal) || ddVal < 0) {
+                errdd.classList.remove('hidden');
+                inputdd.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                errdd.classList.add('hidden');
+                inputdd.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查 yt (尾水深)
+            const ytVal = parseFloat(inputyt.value);
+            if (isNaN(ytVal) || ytVal <= 0) {
+                erryt.classList.remove('hidden');
+                inputyt.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+                isValid = false;
+            } else {
+                erryt.classList.add('hidden');
+                inputyt.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            }
+
+            // 檢查坡度比值 h/l > 1
+            if (!isNaN(hVal) && !isNaN(lVal) && hVal > 0 && lVal > 0) {
+                const slopeRatio = hVal / lVal;
+                slopeRatioVal.textContent = slopeRatio.toFixed(3);
+                if (slopeRatio > 1.0) {
+                    warnSlope.classList.remove('hidden');
+                    inputH.classList.add('border-red-500');
+                    inputL.classList.add('border-red-500');
+                    isValid = false;
+                } else {
+                    warnSlope.classList.add('hidden');
+                }
+            }
+
+            return isValid;
+        }
+
+        // 載入 localStorage 儲存的值
+        function loadSavedValues() {
+            const keys = {
+                'Q': inputQ,
+                'B': inputB,
+                'h': inputH,
+                'l': inputL,
+                'H_total': inputHtotal,
+                'v_allow': inputVallow,
+                'Ld': inputLd,
+                'dd': inputdd,
+                'yt': inputyt
+            };
+            for (const [key, element] of Object.entries(keys)) {
+                const saved = localStorage.getItem('stepflow_' + key);
+                if (saved !== null) {
+                    element.value = saved;
+                }
+            }
+        }
+
+        // 儲存當前值至 localStorage
+        function saveCurrentValues() {
+            const keys = {
+                'Q': inputQ.value,
+                'B': inputB.value,
+                'h': inputH.value,
+                'l': inputL.value,
+                'H_total': inputHtotal.value,
+                'v_allow': inputVallow.value,
+                'Ld': inputLd.value,
+                'dd': inputdd.value,
+                'yt': inputyt.value
+            };
+            for (const [key, value] of Object.entries(keys)) {
+                localStorage.setItem('stepflow_' + key, value);
+            }
+        }
+
+        // 綁定輸入監聽
+        [inputQ, inputB, inputH, inputL, inputHtotal, inputVallow, inputLd, inputdd, inputyt].forEach(element => {
+            element.addEventListener('input', () => {
+                validateInputs();
+                if (validateInputs()) {
+                    runHydraulicCalculation();
+                }
+            });
+        });
+
+        // 3. 牛頓-拉弗森求解趾部水深 y1
+        function solveY1(q, H_res) {
+            let y1 = 0.1; // 初始猜測值
+            const maxIterations = 200;
+            const tolerance = 1e-5;
+
+            for (let i = 0; i < maxIterations; i++) {
+                const f = y1 + (q * q) / (2 * g * y1 * y1) - H_res;
+                let df = 1 - (q * q) / (g * y1 * y1 * y1);
+
+                if (Math.abs(df) < 1e-12) {
+                    df = df < 0 ? -1e-12 : 1e-12;
+                }
+
+                let nextY1 = y1 - f / df;
+
+                if (nextY1 <= 0) {
+                    nextY1 = 0.01;
+                } else if (nextY1 >= H_res) {
+                    nextY1 = H_res - 0.01;
+                }
+
+                if (Math.abs(nextY1 - y1) < tolerance) {
+                    return nextY1;
+                }
+                y1 = nextY1;
+            }
+            return y1;
+        }
+
+        // 4. 水力計算核心
+        function runHydraulicCalculation() {
+            if (!validateInputs()) return;
+
+            // 儲存至 localStorage
+            saveCurrentValues();
+
+            // 讀取輸入值
+            const Q = parseFloat(inputQ.value);
+            const B = parseFloat(inputB.value);
+            const h = parseFloat(inputH.value);
+            const l = parseFloat(inputL.value);
+            const H_total = parseFloat(inputHtotal.value);
+            const v_allow = parseFloat(inputVallow.value);
+            const L_d = parseFloat(inputLd.value);
+            const d_d = parseFloat(inputdd.value);
+            const y_t = parseFloat(inputyt.value);
+
+            // 步驟 1：基礎參數與臨界水深
+            const q = Q / B;
+            const yc = Math.pow((q * q) / g, 1 / 3);
+
+            // 步驟 2：流態判定
+            const slope = h / l;
+            const limitNappe = 0.89 - 0.4 * slope;
+            const limitSkim = 1.1 - 0.325 * slope;
+            const ychRatio = yc / h;
+
+            let regime = "";
+            let regimeClass = "";
+            let regimeDesc = "";
+            let statusTheme = "";
+
+            if (ychRatio < limitNappe) {
+                regime = "跌水流 (Nappe Flow)";
+                regimeClass = "text-sky-600 dark:text-sky-400";
+                regimeDesc = `臨界比值 ${ychRatio.toFixed(3)} < 跌水上限 ${limitNappe.toFixed(3)}。水流以自由跌落方式通過階梯，消能主要靠跌水沖擊。`;
+                statusTheme = "info";
+            } else if (ychRatio > limitSkim) {
+                regime = "滑行流 (Skimming)";
+                regimeClass = "text-emerald-600 dark:text-emerald-400";
+                regimeDesc = `臨界比值 ${ychRatio.toFixed(3)} > 滑行下限 ${limitSkim.toFixed(3)}。水流滑過階梯頂點，階梯內形成消能旋流。`;
+                statusTheme = "success";
+            } else {
+                regime = "過渡流 (Transition)";
+                regimeClass = "text-amber-500 dark:text-amber-400";
+                regimeDesc = `比值介於 ${limitNappe.toFixed(3)} 與 ${limitSkim.toFixed(3)} 之間。水流不穩定且易產生脈動，建議調整階梯尺寸！`;
+                statusTheme = "warning";
+            }
+
+            // 步驟 3：殘餘能量與趾部水深
+            const H0 = H_total + 1.5 * yc;
+            const H_res = H0 * 0.4;
+            const y1 = solveY1(q, H_res);
+            const v1 = q / y1;
+
+            // 步驟 4：靜水池與水躍檢算
+            const Fr1 = v1 / Math.sqrt(g * y1);
+            
+            let needBasin = false;
+            let y2 = 0;
+            let L = 0;
+
+            if (Fr1 > 1.7 || v1 > v_allow) {
+                needBasin = true;
+                y2 = (y1 / 2) * (Math.sqrt(1 + 8 * Fr1 * Fr1) - 1);
+                L = 5 * (y2 - y1);
+            }
+
+            // 靜水池效能與尺寸比對判定
+            let lenStable = false;
+            let depthStable = false;
+            const y_prov = y_t + d_d; // 池內提供之總水深
+
+            if (needBasin) {
+                lenStable = (L_d >= L);
+                depthStable = (y_prov >= y2);
+            }
+
+            // 渲染數據至介面
+            resFlowRegime.innerHTML = `<span class="${regimeClass}">${regime}</span>`;
+            resFlowRegimeDesc.textContent = regimeDesc;
+
+            resV1.innerHTML = `${v1.toFixed(2)} <span class="text-lg font-medium text-slate-500">m/s</span>`;
+            if (v1 > v_allow) {
+                resV1Check.innerHTML = `<span class="text-red-500 font-semibold"><i class="fa-solid fa-circle-xmark mr-1"></i>流速過高 (&gt; ${v_allow} m/s)</span>`;
+            } else {
+                resV1Check.innerHTML = `<span class="text-emerald-500 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>流速合格 (&le; ${v_allow} m/s)</span>`;
+            }
+
+            resFr1.textContent = Fr1.toFixed(2);
+            if (Fr1 > 1.0) {
+                resFr1Type.textContent = "超臨界流 (射流狀態)";
+                resFr1Type.className = "text-xs font-semibold text-amber-500 mt-1.5";
+            } else {
+                resFr1Type.textContent = "亞臨界流 (緩流狀態)";
+                resFr1Type.className = "text-xs font-semibold text-sky-500 mt-1.5";
+            }
+
+            // 靜水池需求建議渲染 (動態提供建議設置的具體原因)
+            if (needBasin) {
+                resBasinReq.innerHTML = `<span class="text-red-600 dark:text-red-400">建議設置</span>`;
+                let reasons = [];
+                if (v1 > v_allow) {
+                    reasons.push(`流速過高 (&gt; ${v_allow.toFixed(1)} m/s)`);
+                }
+                if (Fr1 > 1.7) {
+                    reasons.push(`Fr₁ &gt; 1.7`);
+                }
+                resBasinReqDesc.innerHTML = `<span class="text-red-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1"></i>因 ${reasons.join(' 及 ')}</span>`;
+            } else {
+                resBasinReq.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400">免設靜水池</span>`;
+                resBasinReqDesc.innerHTML = `<span class="text-emerald-500 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>流速合格且 Fr₁ 較低</span>`;
+            }
+
+            // 詳細數據渲染
+            valQ.textContent = `${q.toFixed(3)} CMS/m`;
+            valYc.textContent = `${yc.toFixed(3)} m`;
+            valYchRatio.textContent = ychRatio.toFixed(3);
+            valY1.textContent = `${y1.toFixed(4)} m`;
+            valY2.textContent = needBasin ? `${y2.toFixed(4)} m` : "無需靜水池";
+            valLreq.textContent = needBasin ? `${L.toFixed(2)} m` : "無需靜水池";
+            valLdVal.textContent = `${L_d.toFixed(2)} m`;
+            valddVal.textContent = `${d_d.toFixed(2)} m`;
+            valytVal.textContent = `${y_t.toFixed(2)} m`;
+            valYprov.textContent = `${y_prov.toFixed(2)} m`;
+
+            // 診斷與功效檢核報告卡片更新
+            updateDiagnosticCard(needBasin, v1, v_allow, y2, L, regime, L_d, d_d, y_t, lenStable, depthStable);
+
+            // 更新動態 SVG 示意圖
+            updateHydraulicSvg(yc, y1, y2, L, H_total, regime, needBasin, L_d, d_d, y_t, lenStable, depthStable, h, l);
+        }
+
+        // 更新診斷與功效檢核報告卡片 (修復被截斷的代碼，提供完整的動態評估邏輯)
+        function updateDiagnosticCard(needBasin, v1, v_allow, y2, L, regime, L_d, d_d, y_t, lenStable, depthStable) {
+            diagnosticCard.className = "p-5 rounded-2xl border transition-all duration-300 ";
+            
+            let htmlIcon = "";
+            let title = "";
+            let desc = "";
+
+            if (regime.includes("過渡")) {
+                diagnosticCard.classList.add("bg-amber-50", "dark:bg-amber-950/20", "border-amber-200", "dark:border-amber-900/50", "text-amber-800", "dark:text-amber-300");
+                htmlIcon = `<i class="fa-solid fa-triangle-exclamation text-amber-500 text-2xl"></i>`;
+                title = "建議調整渠底幾何尺寸";
+                desc = `目前臨界比值 y_c/h 落入【過渡流】區間。過渡流在此類跌水工中容易產生不穩定的週期性水面波動與高氣泡紊流，對結構造成局部衝擊疲勞。建議您調大階高 h 或調小階長 l，以引導水流進入更穩定的【滑行流】或【跌水流】。`;
+            } else if (needBasin) {
+                const y_prov = y_t + d_d;
+                // 功效組合判定
+                if (lenStable && depthStable) {
+                    diagnosticCard.classList.add("bg-emerald-50", "dark:bg-emerald-950/20", "border-emerald-200", "dark:border-emerald-900/50", "text-emerald-800", "dark:text-emerald-300");
+                    htmlIcon = `<i class="fa-solid fa-circle-check text-emerald-500 text-2xl"></i>`;
+                    title = "靜水池設計檢算：【合格】 消能池可正常發揮功效";
+                    desc = `設計之靜水池長度 L_d (${L_d.toFixed(2)} m) 大於所需長度 L (${L.toFixed(2)} m)，且池內提供之總水深 y_prov (${y_prov.toFixed(2)} m) 大於共軛水深 y2 (${y2.toFixed(2)} m)，水躍可完全侷限在池內進行安全消能，結構物安全無虞。`;
+                } else {
+                    diagnosticCard.classList.add("bg-red-50", "dark:bg-red-950/20", "border-red-200", "dark:border-red-900/50", "text-red-800", "dark:text-red-300");
+                    htmlIcon = `<i class="fa-solid fa-circle-xmark text-red-500 text-2xl"></i>`;
+                    title = "靜水池設計檢算：【不合格】 建議修正池體尺寸";
+                    let reasons = [];
+                    if (!lenStable) reasons.push(`靜水池長度不足 (設計 L_d = ${L_d.toFixed(2)} m < 所需 L = ${L.toFixed(2)} m)`);
+                    if (!depthStable) reasons.push(`靜水池深度不足 (提供總水深 y_prov = ${y_prov.toFixed(2)} m < 共軛水深 y2 = ${y2.toFixed(2)} m)`);
+                    desc = `檢算結果不合格。主要原因為：${reasons.join(' 及 ')}。水躍可能衝刷下游保護工外河道，建議加長池長或加深池深以確保結構安全。`;
+                }
+            } else {
+                diagnosticCard.classList.add("bg-emerald-50", "dark:bg-emerald-950/20", "border-emerald-200", "dark:border-emerald-900/50", "text-emerald-800", "dark:text-emerald-300");
+                htmlIcon = `<i class="fa-solid fa-circle-check text-emerald-500 text-2xl"></i>`;
+                title = "水力檢算結果：【合格】 流速符合規範";
+                desc = `趾部最大流速 v1 (${v1.toFixed(2)} m/s) 未超過容許流速 v_allow (${v_allow.toFixed(2)} m/s)，且 Froude 數 Fr1 較低，下游不需另設靜水池，可利用天然尾水消能或施作一般保護工即可。`;
+            }
+
+            diagnosticIcon.innerHTML = htmlIcon;
+            diagnosticTitle.textContent = title;
+            diagnosticDesc.textContent = desc;
+        }
+
+        // 5. 動態繪製與更新 SVG (CAD 製圖 True-to-scale 動態比例優化版)
+        function updateHydraulicSvg(yc, y1, y2, L, H_total, regime, needBasin, L_d, d_d, y_t, lenStable, depthStable, h, l) {
+            // 物理長度常數
+            const L_up = 3.0; // 上游平台 3m
+            const N = Math.max(1, Math.round(H_total / h)); // 階梯級數
+            const h_act = H_total / N; // 每階實際高度 (m)
+            const step_l = l; // 階梯長度 (m)
+            const step_w_total = N * step_l; // 階梯段總水平長度 (m)
+
+            // 下游消能池長度
+            const pool_L = needBasin ? L_d : 0;
+            // 下游穩定段長度 (物理尺寸)
+            const L_down = Math.max(5.0, 1.5 * L);
+
+            // 系統物理總寬度與總高度 (m)
+            const totalWidthM = L_up + step_w_total + Math.max(pool_L, L) + L_down;
+
+            // 高度範圍計算
+            // 上游渠底為 y = 0
+            const minY = -H_total - d_d - 1.0; // 安全裕量
+            const maxY = Math.max(yc, y_t - H_total) + 1.0;
+            const totalHeightM = maxY - minY;
+
+            // 畫布尺寸與可用大小
+            const svgWidth = 1000;
+            const svgHeight = 400;
+            const drawWidth = 900;
+            const drawHeight = 280;
+
+            // 計算動態等比例縮放比例尺 scale (px/m)
+            const scaleX = drawWidth / totalWidthM;
+            const scaleY = drawHeight / totalHeightM;
+            const scale = Math.min(scaleX, scaleY);
+
+            // 坐標映射函數 (X_m, Y_m) -> (X_px, Y_px)
+            function getX(m) {
+                return 50 + (m - (-L_up)) * scale;
+            }
+            function getY(m) {
+                return 60 + (maxY - m) * scale;
+            }
+
+            // 產生階梯幾何頂點陣列 (物理坐標，相對於階梯起點 (0, 0))
+            let stepVertices = [];
+            stepVertices.push({x: 0, y: 0});
+            for (let i = 1; i <= N; i++) {
+                // 踏步終點
+                stepVertices.push({x: i * step_l, y: -(i - 1) * h_act});
+                // 踢面終點
+                stepVertices.push({x: i * step_l, y: -i * h_act});
+            }
+
+            const stepEnd_x_m = step_w_total;
+            const stepEnd_y_m = -H_total;
+
+            const poolBottomY_m = -H_total - d_d;
+            const startBasinX_m = stepEnd_x_m;
+            const endBasinX_m = startBasinX_m + pool_L;
+
+            const xUpStart_px = getX(-L_up);
+            const yUpStart_px = getY(0);
+            const xStepStart_px = getX(0);
+
+            // 1. 結構路徑 (混凝土結構)
+            // 由左向右繪製渠道起伏，再圍到底部閉合
+            let structD = `M ${xUpStart_px},${yUpStart_px} L ${xStepStart_px},${yUpStart_px}`;
+            for (let i = 0; i < stepVertices.length; i++) {
+                structD += ` L ${getX(stepVertices[i].x)},${getY(stepVertices[i].y)}`;
+            }
+            if (needBasin) {
+                structD += ` L ${getX(startBasinX_m)},${getY(poolBottomY_m)} L ${getX(endBasinX_m)},${getY(poolBottomY_m)} L ${getX(endBasinX_m)},${getY(stepEnd_y_m)}`;
+            }
+            const xDownEnd_m = stepEnd_x_m + pool_L + L_down;
+            const xDownEnd_px = getX(xDownEnd_m);
+            const yDownStart_px = getY(-H_total);
+
+            structD += ` L ${xDownEnd_px},${yDownStart_px} L ${xDownEnd_px},${svgHeight} L ${xUpStart_px},${svgHeight} Z`;
+            structuralBase.setAttribute('d', structD);
+            updateSvgConcreteGradient();
+
+            // 2. 設計靜水池輔助外框線 (若有消能池)
+            if (needBasin) {
+                basinDesignOutline.classList.remove('hidden');
+                const designColor = (lenStable && depthStable) ? "#10b981" : "#f43f5e";
+                basinDesignOutline.setAttribute('stroke', designColor);
+                
+                const outlineD = `M ${getX(startBasinX_m)},${getY(stepEnd_y_m)} 
+                                  L ${getX(startBasinX_m)},${getY(poolBottomY_m)} 
+                                  L ${getX(endBasinX_m)},${getY(poolBottomY_m)} 
+                                  L ${getX(endBasinX_m)},${getY(stepEnd_y_m)}`;
+                basinDesignOutline.setAttribute('d', outlineD);
+            } else {
+                basinDesignOutline.classList.add('hidden');
+            }
+
+            // 3. 水面與水體路徑繪製
+            const waterUpY = getY(yc); // 上游水面 Y_px
+            let flowPath = "";
+            const isTransition = regime.includes("過渡");
+            waterFlow.setAttribute('fill', isTransition ? 'url(#warnWaterGrad)' : 'url(#waterGrad)');
+
+            // 趾部水面位置
+            const y1_m = y1;
+            const poolBottomY_act = needBasin ? poolBottomY_m : stepEnd_y_m;
+            const toeWaterY_m = poolBottomY_act + y1_m;
+            const startJumpX_px = getX(stepEnd_x_m + 0.1); 
+            const startJumpY_px = getY(toeWaterY_m);
+
+            // 碰撞安全包絡線函數 (計算任何水平點上的階梯表面最高物理高度，防穿套)
+            function getStepMaxY(x_m) {
+                if (x_m < 0) return 0;
+                if (x_m >= step_w_total) return -H_total;
+                const step_idx = Math.floor(x_m / step_l);
+                return -step_idx * h_act;
+            }
+
+            if (regime.includes("跌水流")) {
+                // 跌水流：拋物線分段採樣並加上安全鎖，防止水流在跌落中穿透踏步突出角
+                flowPath = ` L ${xStepStart_px},${waterUpY}`;
+                for (let i = 1; i <= N; i++) {
+                    const startX = (i - 1) * step_l;
+                    const startY = -(i - 1) * h_act;
+                    const pts = 6;
+                    for (let k = 1; k <= pts; k++) {
+                        const t = k / pts;
+                        const x_m = startX + t * step_l;
+                        const y_start = startY + yc * 0.50;
+                        const y_end = startY - h_act + yc * 0.20;
+                        let y_water_m = y_start + (y_end - y_start) * t * t;
+                        // 碰撞安全鎖 (高於階梯面至少 0.08m)
+                        y_water_m = Math.max(y_water_m, getStepMaxY(x_m) + 0.08);
+                        flowPath += ` L ${getX(x_m)},${getY(y_water_m)}`;
+                    }
+                }
+            } else if (regime.includes("滑行流")) {
+                // 滑行流：採樣 30 個點，並套用階梯表面最高包絡線安全鎖，形成平順且絕不穿過階梯的外角包絡水面
+                flowPath = ` L ${xStepStart_px},${waterUpY}`;
+                const pts = 30;
+                for (let k = 1; k <= pts; k++) {
+                    const t = k / pts;
+                    const x_m = t * step_w_total;
+                    const y_depth = yc - (yc - y1) * t;
+                    const y_slope = - (H_total / step_w_total) * x_m;
+                    let y_water_m = y_slope + y_depth;
+                    // 碰撞安全鎖 (高於階梯面至少 0.12m)
+                    y_water_m = Math.max(y_water_m, getStepMaxY(x_m) + 0.12);
+                    flowPath += ` L ${getX(x_m)},${getY(y_water_m)}`;
+                }
+            } else {
+                // 過渡流：波浪起伏採樣連線，套用安全鎖
+                flowPath = ` L ${xStepStart_px},${waterUpY}`;
+                const pts = 40;
+                for (let k = 1; k <= pts; k++) {
+                    const t = k / pts;
+                    const x_m = t * step_w_total;
+                    const y_depth = yc - (yc - y1) * t + 0.12 * Math.sin(t * Math.PI * 4);
+                    const y_slope = - (H_total / step_w_total) * x_m;
+                    let y_water_m = y_slope + y_depth;
+                    // 碰撞安全鎖 (高於階梯面至少 0.10m)
+                    y_water_m = Math.max(y_water_m, getStepMaxY(x_m) + 0.10);
+                    flowPath += ` L ${getX(x_m)},${getY(y_water_m)}`;
+                }
+            }
+
+            // 下游水躍終點
+            const endJumpX_m = stepEnd_x_m + L;
+            const endJumpY_m = poolBottomY_act + y2;
+            const endJumpX_px = getX(endJumpX_m);
+            const endJumpY_px = getY(endJumpY_m);
+
+            // 下游出口水面
+            const outflowY_m = stepEnd_y_m + y_t;
+            const outflowY_px = getY(outflowY_m);
+
+            // 生成水流上表面線段 (加入 L ${startJumpX_px},${startJumpY_px} 以確保趾部水深標註線與水面精確對齊)
+            const waterSurfaceD = `M ${xUpStart_px},${waterUpY}
+                                   ${flowPath}
+                                   L ${startJumpX_px},${startJumpY_px}
+                                   Q ${startJumpX_px + (endJumpX_px - startJumpX_px)/2},${endJumpY_px - 8} ${endJumpX_px},${endJumpY_px}
+                                   L ${xDownEnd_px},${outflowY_px}`;
+            waterSurface.setAttribute('d', waterSurfaceD);
+
+            // 生成封閉水體 path (只在渠道床之上)
+            let waterD = waterSurfaceD;
+            waterD += ` L ${xDownEnd_px},${yDownStart_px}`;
+            waterD += ` L ${getX(endBasinX_m)},${getY(stepEnd_y_m)}`;
+            if (needBasin) {
+                waterD += ` L ${getX(endBasinX_m)},${getY(poolBottomY_m)} L ${getX(startBasinX_m)},${getY(poolBottomY_m)}`;
+            }
+            // 回溯階梯
+            for (let i = stepVertices.length - 1; i >= 0; i--) {
+                waterD += ` L ${getX(stepVertices[i].x)},${getY(stepVertices[i].y)}`;
+            }
+            waterD += ` L ${xUpStart_px},${yUpStart_px} Z`;
+            waterFlow.setAttribute('d', waterD);
+
+            // 4. 繪製水躍區泡沫 (有靜水池時)
+            if (needBasin) {
+                jumpFoam.classList.remove('hidden');
+                const foamD = `M ${startJumpX_px},${startJumpY_px}
+                               Q ${startJumpX_px + (endJumpX_px - startJumpX_px)/2},${endJumpY_px - 8} ${endJumpX_px},${endJumpY_px}
+                               L ${endJumpX_px},${getY(poolBottomY_act)} L ${startJumpX_px},${getY(poolBottomY_act)} Z`;
+                jumpFoam.setAttribute('d', foamD);
+            } else {
+                jumpFoam.classList.add('hidden');
+            }
+
+        // 5. 標註虛線 yc (上游平台上方)
+            ycLine.setAttribute('x1', getX(-L_up));
+            ycLine.setAttribute('x2', getX(0));
+            ycLine.setAttribute('y1', waterUpY);
+            ycLine.setAttribute('y2', waterUpY);
+            ycText.setAttribute('x', getX(-L_up + 0.5));
+            ycText.setAttribute('y', waterUpY - 10);
+            ycText.textContent = `y_c = ${yc.toFixed(2)} m`;
+
+            // 6. 標註 y1 (引線向左下方引折，避開泡沫)
+            if (y1 > 0) {
+                y1Annotation.classList.remove('opacity-0');
+                const y1MidY_px = (getY(poolBottomY_act) + startJumpY_px) / 2;
+                
+                y1Annotation.querySelector('line').setAttribute('x1', startJumpX_px);
+                y1Annotation.querySelector('line').setAttribute('x2', startJumpX_px);
+                y1Annotation.querySelector('line').setAttribute('y1', getY(poolBottomY_act));
+                y1Annotation.querySelector('line').setAttribute('y2', startJumpY_px);
+                
+                const y1Leader = y1Annotation.querySelector('polyline');
+                const leadX1 = startJumpX_px - 10;
+                const leadX2 = startJumpX_px - 50;
+                y1Leader.setAttribute('points', `${startJumpX_px},${y1MidY_px} ${leadX1},${y1MidY_px} ${leadX2},${y1MidY_px}`);
+                
+                const y1TextEl = y1Annotation.querySelector('text');
+                y1TextEl.setAttribute('x', leadX2 - 5);
+                y1TextEl.setAttribute('y', y1MidY_px - 6);
+                y1TextEl.setAttribute('text-anchor', 'end');
+                y1TextEl.textContent = `y₁ = ${y1.toFixed(3)} m`;
+            }
+
+            // 7. 標註 y2 (折線引線向右上方引折)
+            if (needBasin) {
+                y2Annotation.classList.remove('opacity-0', 'hidden');
+                LAnnotation.classList.remove('opacity-0', 'hidden');
+
+                const y2MidY_px = (getY(poolBottomY_act) + endJumpY_px) / 2;
+
+                y2Annotation.querySelector('line').setAttribute('x1', endJumpX_px);
+                y2Annotation.querySelector('line').setAttribute('x2', endJumpX_px);
+                y2Annotation.querySelector('line').setAttribute('y1', getY(poolBottomY_act));
+                y2Annotation.querySelector('line').setAttribute('y2', endJumpY_px);
+                
+                const y2Leader = y2Annotation.querySelector('polyline');
+                const lead2X1 = endJumpX_px + 40;
+                const lead2X2 = endJumpX_px + 100;
+                y2Leader.setAttribute('points', `${endJumpX_px},${y2MidY_px} ${lead2X1},${y2MidY_px - 75} ${lead2X2},${y2MidY_px - 75}`);
+                
+                const y2TextEl = y2Annotation.querySelector('text');
+                y2TextEl.setAttribute('x', lead2X2 + 5);
+                y2TextEl.setAttribute('y', y2MidY_px - 80);
+                y2TextEl.setAttribute('text-anchor', 'start');
+                y2TextEl.textContent = `y₂ = ${y2.toFixed(2)} m`;
+
+                // L 尺寸線 (動態貼近靜水池底板下方 20 像素，安全上限限制在 370 像素內，防止出界)
+                const poolBottomY_px = getY(poolBottomY_m);
+                const L_line_y = Math.min(poolBottomY_px + 20, 370);
+                const L_text_y = Math.min(L_line_y + 27, 395);
+
+                LAnnotation.querySelector('line').setAttribute('x1', getX(stepEnd_x_m));
+                LAnnotation.querySelector('line').setAttribute('x2', endJumpX_px);
+                LAnnotation.querySelector('line').setAttribute('y1', L_line_y);
+                LAnnotation.querySelector('line').setAttribute('y2', L_line_y);
+                
+                LAnnotation.querySelectorAll('polygon')[0].setAttribute('points', `${getX(stepEnd_x_m)},${L_line_y} ${getX(stepEnd_x_m)+8},${L_line_y-4} ${getX(stepEnd_x_m)+8},${L_line_y+4}`);
+                LAnnotation.querySelectorAll('polygon')[1].setAttribute('points', `${endJumpX_px},${L_line_y} ${endJumpX_px-8},${L_line_y-4} ${endJumpX_px-8},${L_line_y+4}`);
+                
+                const LText = LAnnotation.querySelector('text');
+                LText.setAttribute('x', getX(stepEnd_x_m) + (endJumpX_px - getX(stepEnd_x_m))/2);
+                LText.setAttribute('y', L_text_y);
+                LText.setAttribute('text-anchor', 'middle');
+                LText.textContent = `所需 L_req = ${L.toFixed(2)} m (設計 L_d = ${L_d.toFixed(1)} m)`;
+            } else {
+                y2Annotation.classList.add('opacity-0', 'hidden');
+                LAnnotation.classList.add('opacity-0', 'hidden');
+            }
+
+            // 8. H_total 標註更新
+            HAnnotation.querySelector('line').setAttribute('x1', getX(-L_up + 1.0));
+            HAnnotation.querySelector('line').setAttribute('x2', getX(-L_up + 1.0));
+            HAnnotation.querySelector('line').setAttribute('y1', getY(0));
+            HAnnotation.querySelector('line').setAttribute('y2', getY(-H_total));
+            
+            HAnnotation.querySelectorAll('polygon')[0].setAttribute('points', `${getX(-L_up + 1.0)},${getY(0)} ${getX(-L_up + 1.0)-4},${getY(0)+8} ${getX(-L_up + 1.0)+4},${getY(0)+8}`);
+            HAnnotation.querySelectorAll('polygon')[1].setAttribute('points', `${getX(-L_up + 1.0)},${getY(-H_total)} ${getX(-L_up + 1.0)-4},${getY(-H_total)-8} ${getX(-L_up + 1.0)+4},${getY(-H_total)-8}`);
+            
+            const HText = HAnnotation.querySelector('text');
+            HText.setAttribute('x', getX(-L_up + 1.0) + 10);
+            HText.setAttribute('y', getY(-H_total / 2) + 6);
+            HText.textContent = `H_total = ${H_total.toFixed(2)} m`;
+        }
+
+        // 初始化第一次計算
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSavedValues();
+            validateInputs();
+            runHydraulicCalculation();
+        });
+    </script>
+</body>
+</html>
